@@ -34,6 +34,13 @@ class HierarchicalWorld extends Object {
 		updateGraphics();
 		return locked;
 	}
+	public var level(get, null) : Int;
+	public function get_level() {
+		return data.maxDepth - data.depth;
+	}
+
+	var stateAccu = 0.0;
+	var stateCooldown = 0.1;
 
 	function updateGraphics() {
 		if ( debugGraphics == null )
@@ -129,7 +136,9 @@ class HierarchicalWorld extends Object {
 	}
 
 	function calcDist(ctx : h3d.scene.RenderContext) {
-		return ctx.camera.pos.distance(getAbsPos().getPosition());
+		var camPos = new h2d.col.Point(ctx.camera.pos.x, ctx.camera.pos.y);
+		var chunkPos = getAbsPos().getPosition();
+		return camPos.distance(new h2d.col.Point(chunkPos.x, chunkPos.y));
 	}
 
 	override function syncRec(ctx : h3d.scene.RenderContext) {
@@ -143,11 +152,16 @@ class HierarchicalWorld extends Object {
 
 		culled = !bounds.inFrustum(ctx.camera.frustum);
 		if ( !isLeaf() ) {
-			if ( FULL || calcDist(ctx) < data.size * data.subdivPow ) {
-				if ( canSubdivide() ) {
+			var isClose = calcDist(ctx) < data.size * data.subdivPow;
+			if ( (isClose && stateAccu < 0.0) || (!isClose && stateAccu > 0.0) )
+				stateAccu = 0.0;
+			stateAccu += isClose ? ctx.elapsedTime : -ctx.elapsedTime;
+			if ( FULL || stateAccu > stateCooldown ) {
+				stateAccu = 0.0;
+				if ( canSubdivide() )
 					subdivide();
-				}
-			} else if ( !locked ) {
+			} else if ( !locked && -stateAccu > stateCooldown) {
+				stateAccu = 0.0;
 				removeSubdivisions();
 			}
 		}
@@ -170,8 +184,12 @@ class HierarchicalWorld extends Object {
 			(Math.floor(y / chunkSize) + 0.5) * chunkSize);
 	}
 
+	public function containsAt(x : Float, y : Float) {
+		return bounds.contains(new h3d.col.Point(x, y, 0.0));
+	}
+
 	public function requestCreateAt(x : Float, y : Float, lock : Bool) {
-		if ( !bounds.contains(new h3d.col.Point(x, y, 0.0)) )
+		if ( !containsAt(x, y) )
 			return;
 		if ( lock )
 			locked = true;
@@ -185,7 +203,7 @@ class HierarchicalWorld extends Object {
 	}
 
 	public function lockAt(x : Float, y : Float) {
-		if ( !bounds.contains(new h3d.col.Point(x, y, 0.0)) )
+		if ( !containsAt(x, y) )
 			return;
 		locked = true;
 		for ( c in children ) {
@@ -197,7 +215,7 @@ class HierarchicalWorld extends Object {
 	}
 
 	public function unlockAt(x : Float, y : Float) {
-		if ( !bounds.contains(new h3d.col.Point(x, y, 0.0)) )
+		if ( !containsAt(x, y) )
 			return;
 		locked = false;
 		for ( c in children ) {
@@ -223,5 +241,15 @@ class HierarchicalWorld extends Object {
 		while ( Std.isOfType(root.parent, HierarchicalWorld) )
 			root = root.parent;
 		return cast root;
+	}
+
+	public function refresh() {
+		subdivided = false;
+		var i = children.length;
+		while ( i-- > 0 ) {
+			var node = Std.downcast(children[i], h3d.scene.HierarchicalWorld);
+			if ( node != null )
+				node.remove();
+		}
 	}
 }

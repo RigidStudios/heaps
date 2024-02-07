@@ -18,8 +18,12 @@ private class FormatMap {
 private class ContextShared extends hrt.prefab.ContextShared {
 	var customLoadTexture : String -> h3d.mat.Texture;
 
-	public function new(loadTexture : String -> h3d.mat.Texture, ?res : hxd.res.Resource) {
-		super(res);
+	public function new(loadTexture : String -> h3d.mat.Texture, ?root3d: h3d.scene.Object = null) {
+		#if prefab2
+		super(root3d);
+		#else
+		super();
+		#end
 		this.customLoadTexture = loadTexture;
 	}
 
@@ -765,13 +769,12 @@ class Library {
 			materialContainer = new h3d.scene.Mesh(null, mat, null);
 
 	#if prefab2
-		var shared = new ContextShared(loadTexture, null);
-
+		var shared = new ContextShared(loadTexture, materialContainer);
         materialContainer.material = mat;
-        m.make(materialContainer,shared);
+        m.make(shared);
 	#else
 		var ctx = new hrt.prefab.Context();
-		ctx.shared = new ContextShared(loadTexture, null);
+		ctx.shared = new ContextShared(loadTexture);
 
 		materialContainer.material = mat;
 		ctx.local3d = materialContainer;

@@ -351,6 +351,33 @@ class CustomParser extends domkit.CssValue.ValueParser {
 		}
 	}
 
+	public function transitionColorAdjust(col1: h3d.Matrix.ColorAdjust, col2: h3d.Matrix.ColorAdjust, t: Float) {
+		inline function defaultValues(col: h3d.Matrix.ColorAdjust) {
+			var c : h3d.Matrix.ColorAdjust = { saturation: 0, lightness: 0,	hue: 0,	contrast: 0, gain: { color: 0, alpha: 0 } };
+			if (col != null) {
+				if (col.saturation != null) c.saturation = col.saturation;
+				if (col.lightness != null) c.lightness = col.lightness;
+				if (col.hue != null) c.hue = col.hue;
+				if (col.contrast != null) c.contrast = col.contrast;
+				if (col.gain != null) c.gain = col.gain;
+			}
+			return c;
+		}
+
+		var col1 = defaultValues(col1);
+		var col2 = defaultValues(col2);
+		return {
+			saturation: hxd.Math.lerp(col1.saturation, col2.saturation, t),
+			lightness: hxd.Math.lerp(col1.lightness, col2.lightness, t),
+			hue: hxd.Math.lerp(col1.hue, col2.hue, t),
+			contrast: hxd.Math.lerp(col1.contrast, col2.contrast, t),
+			gain: {
+				color: transitionColor(col1.gain.color, col2.gain.color, t),
+				alpha: hxd.Math.lerp(col1.gain.alpha, col2.gain.alpha, t)
+			}
+		};
+	}
+
 	public function parseColorAdjust(value:CssValue) : h3d.Matrix.ColorAdjust {
 		if( value.match(VIdent("none")) )
 			return null;
@@ -578,7 +605,7 @@ class DrawableComp extends ObjectComp implements domkit.Component.ComponentDecl<
 
 	@:p(colorF) @:t(colorF) #if domkit_drawable_color var color #else var tint #end : h3d.Vector4;
 	@:p(auto) var smooth : Null<Bool>;
-	@:p(colorAdjust) var colorAdjust : Null<h3d.Matrix.ColorAdjust>;
+	@:p(colorAdjust) @:t(colorAdjust) var colorAdjust : Null<h3d.Matrix.ColorAdjust>;
 	@:p var tileWrap : Bool;
 
 	static function #if domkit_drawable_color set_color #else set_tint #end( o : h2d.Drawable, v ) {
@@ -747,6 +774,7 @@ class ScaleGridComp extends DrawableComp implements domkit.Component.ComponentDe
 	@:p var ignoreScale : Bool;
 	@:p var borderScale : Float;
 	@:p var tileBorders : Bool;
+	@:p var tileCenter : Bool;
 	@:p var width : Float;
 	@:p var height : Float;
 
@@ -764,6 +792,10 @@ class ScaleGridComp extends DrawableComp implements domkit.Component.ComponentDe
 
 	static function set_tileBorders(o : h2d.ScaleGrid, v) {
 		o.tileBorders = v;
+	}
+
+	static function set_tileCenter(o : h2d.ScaleGrid, v) {
+		o.tileCenter = v;
 	}
 
 	static function set_width( o : h2d.ScaleGrid, v : Float ) {
@@ -791,6 +823,7 @@ class FlowComp extends ObjectComp implements domkit.Component.ComponentDecl<h2d.
 	@:p var backgroundTilePosY : Null<Int>;
 	@:p var backgroundAlpha : Float = 1;
 	@:p(auto) var backgroundSmooth : Null<Bool>;
+	@:p var backgroundRepeat : Bool;
 	@:p var debug : Bool;
 	@:p var layout : h2d.Flow.FlowLayout;
 	@:p var vertical : Bool;
@@ -866,6 +899,11 @@ class FlowComp extends ObjectComp implements domkit.Component.ComponentDecl<h2d.
 
 	static function set_backgroundTile( o : h2d.Flow, t ) {
 		o.backgroundTile = t;
+	}
+
+	static function set_backgroundRepeat( o : h2d.Flow, v ) {
+		@:privateAccess if( o.background != null )
+			o.background.tileBorders = o.background.tileCenter = v;
 	}
 
 	static function set_backgroundTilePos( o : h2d.Flow, pos ) {
